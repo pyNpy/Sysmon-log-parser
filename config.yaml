@@ -1,0 +1,22 @@
+mysql:
+  host: localhost
+  user: root
+  password:
+  db: pythontest
+  port:
+other:
+  preprocessing_queue:
+    - preprocessing.scale_and_center
+    - preprocessing.dot_reduction
+    - preprocessing.connect_lines
+  use_anonymous: yes
+
+elastic:
+  host: 192.168.18.247
+  port: 9200
+  index: testattackdata
+  title: attacking
+
+file:
+  path: microsoft-windows-sysmon4operational.evtx
+  mode: backlog #backlog, tail

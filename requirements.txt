@@ -1,0 +1,8 @@
+elasticsearch
+pymysql
+pyyaml
+requests
+python-evtx
+xmltodict
+# Elasticsearch 6.x
+elasticsearch6>=6.0.0,<7.0.0
