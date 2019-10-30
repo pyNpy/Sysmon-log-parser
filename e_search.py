@@ -120,6 +120,18 @@ def conver_dict(data,abx):
         abx['Event']['EventData']['Data'].append(rule)
         abx['Event']['EventData']['Data'].remove(data)
         return abx
+    elif len(data) == 2 and "Name" in data and data['Name'] == "ProcessId":
+        rule = {}
+        rule['ProcessId'] = data['text']
+        abx['Event']['EventData']['Data'].append(rule)
+        abx['Event']['EventData']['Data'].remove(data)
+        return abx
+    elif len(data) == 2 and "Name" in data and data['Name'] == "ParentProcessId":
+        rule = {}
+        rule['technique_name'] = data['text']
+        abx['Event']['EventData']['Data'].append(rule)
+        abx['Event']['EventData']['Data'].remove(data)
+        return abx
     else:
         return None
 
