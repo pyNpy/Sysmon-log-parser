@@ -14,8 +14,8 @@ from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.search import Search
 
 
-def save(obj):
-    with open("saved_index", 'wb') as fobj:
+def save(obj,file_name):
+    with open(file_name, 'wb') as fobj:
         pickle.dump(obj, fobj)
 
 
@@ -133,8 +133,8 @@ def conver_dict(data, abx):
 
 
 def bulk_test_insertion():
-    if os.path.exists('saved_index'):
-        oldL = load('saved_index')
+    if os.path.exists('saved_record'):
+        oldL = load('saved_record')
         ind = load('saved_index')
     else:
         oldL = 0
@@ -151,7 +151,7 @@ def bulk_test_insertion():
                         go_get = conver_dict(data, abx)
                         if go_get != None:
                             sav_dict = go_get
-                        if len(data) == 2 and "Name" in data and data['Name'] == "Image":
+                        elif len(data) == 2 and "Name" in data and data['Name'] == "Image":
                             if 'C:\Windows\System32\wbem\WMIC.exe' == data['text'] \
                                     or 'C:\Windows\System32\SppExtComObj.Exe' == data['text'] \
                                     or "C:\\Users\\admin\AppData\Local\Programs\Python\Python37\pythonw.exe" == data[
@@ -162,10 +162,11 @@ def bulk_test_insertion():
                                           '_id': ind,
                                           '_source': sav_dict}
                                 actions.append(action)
+                                save(ind, 'saved_index')
                                 ind += 1
 
                     oldL += 1
-                    save(oldL)
+                    save(oldL,'saved_record')
                     if ind % 50 == 0:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
@@ -202,10 +203,11 @@ def tailing():
                                           '_id': ind,
                                           '_source': sav_dict}
                                 actions.append(action)
+                                save(ind, 'saved_index')
                                 ind += 1
 
                     oldL += 1
-                    save(oldL)
+                    save(oldL,'saved_record')
                     if ind % 50 == 0:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
@@ -214,6 +216,7 @@ def tailing():
             else:
                 time.sleep(0.5)
     outfile.close()
+
 
 if config['file']['mode'] == 'tail':
     tailing()
