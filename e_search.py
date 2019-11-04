@@ -215,7 +215,7 @@ def tailing():
                 time.sleep(0.5)
     outfile.close()
 
-if config['file']['mode'] == 'backlog':
+if config['file']['mode'] == 'tail':
     tailing()
-elif config['file']['mode'] == 'tail':
+elif config['file']['mode'] == 'backlog':
     bulk_test_insertion()
