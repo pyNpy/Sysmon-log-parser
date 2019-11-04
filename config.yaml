@@ -19,4 +19,4 @@ elastic:
 
 file:
   path: microsoft-windows-sysmon4operational.evtx
-  mode: backlog #backlog, tail
+  mode: backlog #tail

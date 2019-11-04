@@ -215,16 +215,7 @@ def tailing():
                 time.sleep(0.5)
     outfile.close()
 
-
-while (True):
-    get_user_decision = input("press \'1\' for tailing only, press \'2\' for backlog, press \'3\' for exit : ")
-    if get_user_decision == '1':
-        tailing()
-        break
-    elif get_user_decision == '2':
-        bulk_test_insertion()
-        break
-    elif get_user_decision == '3':
-        break
-    else:
-        print('wrong input')
+if config['file']['mode'] == 'backlog':
+    tailing()
+elif config['file']['mode'] == 'tail':
+    bulk_test_insertion()
