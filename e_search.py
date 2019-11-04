@@ -84,7 +84,7 @@ def bulk_insertion():
         while True:
             new = list(rec.records())
             newl = len(new)
-            if new and newl > oldL:
+            if newl > oldL:
                 while (newl > oldL):
                     data = convert_xml_to_json(new[oldL].xml())
                     oldL = oldL + 1
@@ -135,23 +135,22 @@ def conver_dict(data, abx):
 def bulk_test_insertion():
     if os.path.exists('saved_record'):
         oldL = load('saved_record')
-        ind = load('saved_index')
     else:
         oldL = 0
-        ind = 0
     actions = []
     with evtx.Evtx(config['file']['path']) as rec:
         while True:
             new = list(rec.records())
             newl = len(new)
-            if newl > oldL and newl - oldL >= 50:
+            if newl > oldL:
                 while newl > oldL:
                     abx = convert_xml_to_json(new[oldL].xml())
+                    id_event = abx['Event']['System']['TimeCreated']['SystemTime']
                     for data in abx['Event']['EventData']['Data']:
                         go_get = conver_dict(data, abx)
                         if go_get != None:
                             sav_dict = go_get
-                        elif len(data) == 2 and "Name" in data and data['Name'] == "Image":
+                        if len(data) == 2 and "Name" in data and data['Name'] == "Image":
                             if 'C:\Windows\System32\wbem\WMIC.exe' == data['text'] \
                                     or 'C:\Windows\System32\SppExtComObj.Exe' == data['text'] \
                                     or "C:\\Users\\admin\AppData\Local\Programs\Python\Python37\pythonw.exe" == data[
@@ -159,15 +158,16 @@ def bulk_test_insertion():
                                 print("Noise")
                             else:
                                 action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
-                                          '_id': ind,
+                                          '_id': id_event,
                                           '_source': sav_dict}
                                 actions.append(action)
-                                save(ind, 'saved_index')
-                                ind += 1
 
                     oldL += 1
                     save(oldL,'saved_record')
-                    if ind % 50 == 0:
+                    temp = len(actions)
+                    print(oldL)
+                    print(temp)
+                    if temp == 50:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
                         actions = []
@@ -181,13 +181,13 @@ def tailing():
     actions = []
     with evtx.Evtx(config['file']['path']) as rec:
         oldL = len(list(rec.records()))
-        ind = len(list(rec.records()))
         while True:
             new = list(rec.records())
             newl = len(new)
-            if newl > oldL and newl - oldL >= 50:
+            if newl > oldL :
                 while newl > oldL:
                     abx = convert_xml_to_json(new[oldL].xml())
+                    id_event = abx['Event']['System']['TimeCreated']['SystemTime']
                     for data in abx['Event']['EventData']['Data']:
                         go_get = conver_dict(data, abx)
                         if go_get != None:
@@ -200,15 +200,16 @@ def tailing():
                                 print("Noise")
                             else:
                                 action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
-                                          '_id': ind,
+                                          '_id': id_event,
                                           '_source': sav_dict}
                                 actions.append(action)
-                                save(ind, 'saved_index')
-                                ind += 1
+
 
                     oldL += 1
                     save(oldL,'saved_record')
-                    if ind % 50 == 0:
+                    temp = len(actions)
+                    print(temp)
+                    if temp == 50:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
                         actions = []
