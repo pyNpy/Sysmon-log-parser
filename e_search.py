@@ -12,13 +12,17 @@ from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.search import Search
+
+
 def save(obj):
     with open("saved_index", 'wb') as fobj:
         pickle.dump(obj, fobj)
 
+
 def load(file_name):
     with open(file_name, 'rb') as fobj:
         return pickle.load(fobj)
+
 
 with open("config.yaml", "r") as yamlfile:
     config = yaml.safe_load(yamlfile)
@@ -63,14 +67,6 @@ def get_uuid():
 # function to convert xml into dictionary
 def convert_xml_to_json(data_in_xml):
     abx = json.loads(json.dumps(xmltodict.parse(data_in_xml, attr_prefix='', cdata_key='text')))
-    # for data in abx['Event']['EventData']['Data']:
-    #     if len(data) == 2 and "Name" in data and data['Name'] == "RuleName":
-    #         d = data['text'].split(',')
-    #         rule = {}
-    #         rule['technique_id'] = d[0].split('=')[1]
-    #         rule['technique_name'] = d[1].split('=')[1]
-    #         abx['Event']['EventData']['Data'].append(rule)
-    #         abx['Event']['EventData']['Data'].remove(data)
     return abx
 
 
@@ -103,8 +99,8 @@ def bulk_insertion():
             else:
                 time.sleep(0.5)
 
-def conver_dict(data,abx):
 
+def conver_dict(data, abx):
     if len(data) == 2 and "Name" in data and data['Name'] == "RuleName":
         d = data['text'].split(',')
         rule = {}
@@ -136,8 +132,6 @@ def conver_dict(data,abx):
         return None
 
 
-
-
 def bulk_test_insertion():
     if os.path.exists('saved_index'):
         oldL = load('saved_index')
@@ -164,7 +158,8 @@ def bulk_test_insertion():
                                 'text']:
                                 print("Noise")
                             else:
-                                action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'], '_id': ind,
+                                action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
+                                          '_id': ind,
                                           '_source': sav_dict}
                                 actions.append(action)
                                 ind += 1
@@ -181,4 +176,55 @@ def bulk_test_insertion():
     outfile.close()
 
 
-bulk_test_insertion()
+def tailing():
+    actions = []
+    with evtx.Evtx(config['file']['path']) as rec:
+        oldL = len(list(rec.records()))
+        ind = len(list(rec.records()))
+        while True:
+            new = list(rec.records())
+            newl = len(new)
+            if newl > oldL and newl - oldL >= 50:
+                while newl > oldL:
+                    abx = convert_xml_to_json(new[oldL].xml())
+                    for data in abx['Event']['EventData']['Data']:
+                        go_get = conver_dict(data, abx)
+                        if go_get != None:
+                            sav_dict = go_get
+                        if len(data) == 2 and "Name" in data and data['Name'] == "Image":
+                            if 'C:\Windows\System32\wbem\WMIC.exe' == data['text'] \
+                                    or 'C:\Windows\System32\SppExtComObj.Exe' == data['text'] \
+                                    or "C:\\Users\\admin\AppData\Local\Programs\Python\Python37\pythonw.exe" == data[
+                                'text']:
+                                print("Noise")
+                            else:
+                                action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
+                                          '_id': ind,
+                                          '_source': sav_dict}
+                                actions.append(action)
+                                ind += 1
+
+                    oldL += 1
+                    save(oldL)
+                    if ind % 50 == 0:
+                        print("Inserting the records")
+                        helpers.bulk(es, actions)
+                        actions = []
+
+            else:
+                time.sleep(0.5)
+    outfile.close()
+
+
+while (True):
+    get_user_decision = input("press \'1\' for tailing only, press \'2\' for backlog, press \'3\' for exit : ")
+    if get_user_decision == '1':
+        tailing()
+        break
+    elif get_user_decision == '2':
+        bulk_test_insertion()
+        break
+    elif get_user_decision == '3':
+        break
+    else:
+        print('wrong input')
