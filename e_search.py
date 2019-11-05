@@ -14,7 +14,7 @@ from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.search import Search
 
 
-def save(obj,file_name):
+def save(obj, file_name):
     with open(file_name, 'wb') as fobj:
         pickle.dump(obj, fobj)
 
@@ -70,74 +70,44 @@ def convert_xml_to_json(data_in_xml):
     return abx
 
 
-# Function for extracting data from sysmon evtx file and store on server
-def bulk_insertion():
-    ind = 1
-    oldL = 0
-    # mac = str(get_mac())
-    # ip = str(get_ip_address())
-    # uuidd = str(get_uuid())
-
-    with evtx.Evtx(config['file']['path']) as rec:
-        # re = list(rec.records())
-        actions = []
-        while True:
-            new = list(rec.records())
-            newl = len(new)
-            if newl > oldL:
-                while (newl > oldL):
-                    data = convert_xml_to_json(new[oldL].xml())
-                    oldL = oldL + 1
-                    action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'], '_id': ind,
-                              '_source': data}
-                    actions.append(action)
-                    if ind % 50 == 0:
-                        print("Inserting the records")
-                        helpers.bulk(es, actions)
-                        actions = []
-                    ind += 1
-            else:
-                time.sleep(0.5)
-
-
-def conver_dict(data, abx):
-    if len(data) == 2 and "Name" in data and data['Name'] == "RuleName":
-        d = data['text'].split(',')
-        rule = {}
-        rule['technique_id'] = d[0].split('=')[1]
-        rule['technique_name'] = d[1].split('=')[1]
-        abx['Event']['EventData']['Data'].append(rule)
-        abx['Event']['EventData']['Data'].remove(data)
-        return abx
-    elif len(data) == 1 and "Name" in data and data['Name'] == "RuleName":
-        rule = {}
-        rule['technique_id'] = ''
-        rule['technique_name'] = ''
-        abx['Event']['EventData']['Data'].append(rule)
-        abx['Event']['EventData']['Data'].remove(data)
-        return abx
-    elif len(data) == 2 and "Name" in data and data['Name'] == "ProcessId":
-        rule = {}
-        rule['ProcessId'] = data['text']
-        abx['Event']['EventData']['Data'].append(rule)
-        abx['Event']['EventData']['Data'].remove(data)
-        return abx
-    elif len(data) == 2 and "Name" in data and data['Name'] == "ParentProcessId":
-        rule = {}
-        rule['technique_name'] = data['text']
-        abx['Event']['EventData']['Data'].append(rule)
-        abx['Event']['EventData']['Data'].remove(data)
-        return abx
-    else:
-        return None
+def conver_dict(abx):
+    for data in abx['Event']['EventData']['Data']:
+        if len(data) == 2 and "Name" in data and data['Name'] == "RuleName":
+            d = data['text'].split(',')
+            rule = {}
+            rule['technique_id'] = d[0].split('=')[1]
+            rule['technique_name'] = d[1].split('=')[1]
+            abx['Event']['EventData']['Data'].append(rule)
+            abx['Event']['EventData']['Data'].remove(data)
+        elif len(data) == 1 and "Name" in data and data['Name'] == "RuleName":
+            rule = {}
+            rule['technique_id'] = ''
+            rule['technique_name'] = ''
+            abx['Event']['EventData']['Data'].append(rule)
+            abx['Event']['EventData']['Data'].remove(data)
+        elif len(data) == 2 and "Name" in data and data['Name'] == "ProcessId":
+            rule = {}
+            rule['ProcessId'] = data['text']
+            abx['Event']['EventData']['Data'].append(rule)
+            abx['Event']['EventData']['Data'].remove(data)
+        elif len(data) == 2 and "Name" in data and data['Name'] == "ParentProcessId":
+            rule = {}
+            rule['technique_name'] = data['text']
+            abx['Event']['EventData']['Data'].append(rule)
+            abx['Event']['EventData']['Data'].remove(data)
+        else:
+            continue
+    return abx
 
 
 def bulk_test_insertion():
     if os.path.exists('saved_record'):
         oldL = load('saved_record')
+        if os.path.exists('saved_list'):
+            actions = load('saved_list')
     else:
         oldL = 0
-    actions = []
+        actions = []
     with evtx.Evtx(config['file']['path']) as rec:
         while True:
             new = list(rec.records())
@@ -146,10 +116,8 @@ def bulk_test_insertion():
                 while newl > oldL:
                     abx = convert_xml_to_json(new[oldL].xml())
                     id_event = abx['Event']['System']['TimeCreated']['SystemTime']
+                    sav_dict = conver_dict(abx)
                     for data in abx['Event']['EventData']['Data']:
-                        go_get = conver_dict(data, abx)
-                        if go_get != None:
-                            sav_dict = go_get
                         if len(data) == 2 and "Name" in data and data['Name'] == "Image":
                             if 'C:\Windows\System32\wbem\WMIC.exe' == data['text'] \
                                     or 'C:\Windows\System32\SppExtComObj.Exe' == data['text'] \
@@ -158,19 +126,18 @@ def bulk_test_insertion():
                                 print("Noise")
                             else:
                                 action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
-                                          '_id': id_event,
-                                          '_source': sav_dict}
+                                          '_id': id_event, '_source': sav_dict}
                                 actions.append(action)
+                                save(actions, 'saved_list')
 
                     oldL += 1
-                    save(oldL,'saved_record')
+                    save(oldL, 'saved_record')
                     temp = len(actions)
-                    print(oldL)
-                    print(temp)
                     if temp == 50:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
                         actions = []
+                        save(actions, 'saved_list')
 
             else:
                 time.sleep(0.5)
@@ -184,14 +151,12 @@ def tailing():
         while True:
             new = list(rec.records())
             newl = len(new)
-            if newl > oldL :
+            if newl > oldL:
                 while newl > oldL:
                     abx = convert_xml_to_json(new[oldL].xml())
                     id_event = abx['Event']['System']['TimeCreated']['SystemTime']
+                    sav_dict = conver_dict(abx)
                     for data in abx['Event']['EventData']['Data']:
-                        go_get = conver_dict(data, abx)
-                        if go_get != None:
-                            sav_dict = go_get
                         if len(data) == 2 and "Name" in data and data['Name'] == "Image":
                             if 'C:\Windows\System32\wbem\WMIC.exe' == data['text'] \
                                     or 'C:\Windows\System32\SppExtComObj.Exe' == data['text'] \
@@ -200,15 +165,11 @@ def tailing():
                                 print("Noise")
                             else:
                                 action = {'_index': config['elastic']['index'], '_type': config['elastic']['title'],
-                                          '_id': id_event,
-                                          '_source': sav_dict}
+                                          '_id': id_event, '_source': sav_dict}
                                 actions.append(action)
 
-
                     oldL += 1
-                    save(oldL,'saved_record')
                     temp = len(actions)
-                    print(temp)
                     if temp == 50:
                         print("Inserting the records")
                         helpers.bulk(es, actions)
